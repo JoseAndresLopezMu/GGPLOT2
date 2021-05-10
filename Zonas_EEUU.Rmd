@@ -1,0 +1,140 @@
+---
+title: "Zona Paises"
+author: "JoseAndres"
+date: "10/5/2021"
+output: html_document
+---
+
+## Agrupación de las zonas de Estados Unidos
+
+### Distribución de las zonas de Estados Unidos
+
+### Paso del tiempo de los inmuebles en el momento de registrarse en Zillow
+
+Se observa cómo cambian estos valores según pasan los días cuando están registrados en Zillow.
+
+
+```{r}
+state <- read.csv("State_time_series.csv")
+```
+
+
+```{r}
+aggregate(ZHVI_AllHomes ~DaysOnZillow_AllHomes, state, mean)%>%
+  ggplot(aes(x=DaysOnZillow_AllHomes, y=ZHVI_AllHomes))+
+  geom_line(col="#736439")+
+  labs(title="Dismución del valor de venta de la vivienda", x=NULL, y=NULL)+
+    stat_smooth(method="loess", color="#736439", alpha=0.3)+
+  theme_minimal()
+
+
+
+aggregate(ZRI_AllHomes ~DaysOnZillow_AllHomes, state, mean)%>%
+  ggplot(aes(x=DaysOnZillow_AllHomes, y=ZRI_AllHomes))+
+  geom_line(col="#571221")+
+  labs(title="Disminución del precio del alquiler", x=NULL, y=NULL)+
+   stat_smooth(method="loess", color="#571221", alpha=0.3)+
+  theme_minimal()
+```
+
+
+
+```{r message=FALSE,warning=FALSE,fig.width=15}
+state$us_region <- ''
+new_england <- c('Connecticut', 'Maine', 'Massachusetts', 'NewHampshire', 'RhodeIsland','Vermont')
+mid_atlantic <- c('NewJersey', 'NewYork', 'Pennsylvania')
+east_north_central <- c('Illinois', 'Indiana', 'Michigan', 'Ohio','Wisconsin')
+west_north_central <- c('Iowa', 'Kansas', 'Minnesota', 'Missouri', 'Nebraska', 'NorthDakota', 'SouthDakota')
+south_atlantic <- c('Delaware', 'Florida', 'Georgia', 'Maryland', 'NorthCarolina', 'SouthCarolina', 'Virginia', 'DistrictofColumbia','WestVirginia')
+east_south_central <- c('Alabama', 'Kentucky', 'Mississippi', 'Tennessee')
+west_south_central <- c('Arkansas', 'Louisiana', 'Oklahoma', 'Texas')
+mountain <- c('Arizona', 'Colorado', 'Idaho', 'Montana', 'Nevada', 'NewMexico', 'Utah', 'Wyoming')
+pacific <- c('Alaska', 'California', 'Hawaii', 'Oregon', 'Washington')
+
+state_with_region <- state %>%
+  mutate(us_region=ifelse(RegionName %in% new_england,"New England",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% mid_atlantic,"Mid Altantic",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% new_england,"New England",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% east_north_central,"East North Central",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% west_north_central,"West North Central",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% south_atlantic,"South Atlantic",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% east_south_central,"East South Central",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% west_south_central,"West South Central",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% mountain,"Mountain",us_region)) %>%
+  mutate(us_region=ifelse(RegionName %in% pacific,"Pacific",us_region))
+
+
+
+```
+
+
+```{r}
+plot_RegionName <- state_with_region %>%
+    ggplot(ggplot2::aes(y = log(ZHVI_AllHomes))) +
+    geom_boxplot(ggplot2::aes(x = "All"), notch = TRUE, fill = "grey") +
+    stat_summary(ggplot2::aes(x = "All"), fun.y = mean, geom = "point", shape = 8) +
+    geom_boxplot(ggplot2::aes(x = us_region, fill = us_region)) +
+    stat_summary(ggplot2::aes(x = us_region), fun.y = mean, geom = "point", shape = 8) +
+    xlab("Estado") +
+    ylab("Log del Precio de Venta") +
+    ggtitle("Distribución del Precio de Venta según la zona de Estados Unidos") +
+    theme(legend.position = "none") + 
+    theme(axis.text.x = element_text(angle = 50, hjust = 1))
+```
+
+```{r}
+plot_RegionName
+```
+
+
+# PROBANDO PARA QUE SALGA PAISES CON BURBUJAS
+
+```{r}
+state_with_region$Date <- state_with_region$Date %>% as.Date
+state_with_region$Year <- year(state_with_region$Date)
+```
+
+```{r}
+state_with_region$ZHVI <- ifelse(is.na(state_with_region$ZHVI_AllHomes),
+                                 median(state_with_region$ZHVI_AllHomes, na.rm = TRUE),
+                                 state_with_region$ZHVI_AllHomes)
+```
+
+
+link : https://github.com/gonzalezgouveia/gganimate
+
+```{r}
+state_with_region$Days <- ifelse(is.na(state_with_region$DaysOnZillow_AllHomes),
+                                 median(state_with_region$DaysOnZillow_AllHomes, na.rm = TRUE),
+                                 state_with_region$DaysOnZillow_AllHomes)
+```
+
+
+```{r}
+state_region <- state_with_region[,c("ZHVI","Year","Days","us_region")]
+```
+
+```{r}
+head(state_region)
+```
+
+
+```{r}
+library(gapminder)
+
+p_animate <-state_with_region %>%
+  ggplot(aes(Days, ZHVI, size = 0.1, colour = us_region)) +
+  geom_point(alpha = 0.7, show.legend = FALSE) +
+  # scale_colour_manual(values = country_colors) + # problema es que el mapa de colores no se ajusta a las regiones
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  facet_wrap(~us_region) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Year: {frame_along}', x = 'GDP per capita', y = 'life expectancy') +
+  transition_reveal(Year) +
+  ease_aes('linear')
+
+animate(p_animate, fps = 3) # Modifica velocidad
+```
+
+
